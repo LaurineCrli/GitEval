@@ -1,0 +1,129 @@
+version: '3.5'
+services:
+
+  # Service mongoDB
+  mongo:
+    image: mongo
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - 27017:27017
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
+      - MONGO_INITDB_DATABASE=auth
+    networks:
+      - mon-reseau
+
+  # Service mongo express : Interface pour mongoDB
+  mongo-express:
+    image: mongo-express
+    env_file: .env
+    ports:
+      - 8082:8081
+    environment:
+      - ME_CONFIG_MONGODB_ENABLE_ADMIN=true
+      - ME_CONFIG_MONGODB_ADMINUSERNAME=${ME_CONFIG_MONGODB_ADMINUSERNAME}
+      - ME_CONFIG_MONGODB_ADMINPASSWORD=${ME_CONFIG_MONGODB_ADMINPASSWORD}
+      - ME_CONFIG_MONGODB_SERVER=${ME_CONFIG_MONGODB_SERVER}
+      - ME_CONFIG_BASICAUTH_USERNAME=${ME_CONFIG_BASICAUTH_USERNAME}
+      - ME_CONFIG_BASICAUTH_PASSWORD=${ME_CONFIG_BASICAUTH_PASSWORD}
+      - ME_CONFIG_MONGODB_PORT=${ME_CONFIG_MONGODB_PORT}
+    depends_on:
+      - mongo
+    networks:
+      - mon-reseau
+
+  # Application NEST
+  app:
+    build:
+      context: .
+      dockerfile: dockerfile
+    ports:
+      - 3000:3000
+    depends_on:
+      - mongo
+      - web
+    networks:
+      - mon-reseau
+
+  app-replica:
+    build:
+      context: .
+      dockerfile: dockerfile
+    ports:
+      - 3001:3000
+    depends_on:
+      - mongo
+      - web
+    networks:
+      - mon-reseau
+
+  # Service web nginx
+  web:
+    image: 'jc21/nginx-proxy-manager'
+    restart: unless-stopped
+    volumes:
+    - ./templates:/etc/nginx/templates
+    - /etc/letsencrypt:/etc/letsencrypt 
+    ports:
+      - '80:80' # Port HTTP
+      - '81:81' # Interface d'administration NPM
+    environment:
+    - NGINX_HOST=foobar.com
+    - NGINX_PORT=80
+    - DISABLE_HTTPS=true
+    networks:
+      - mon-reseau
+
+  # Elasticsearch service
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.15.0
+    environment:
+      - discovery.type=single-node
+      - ELASTIC_PASSWORD=${ELASTICSEARCH_PASSWORD}
+      - "xpack.security.enabled=true"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    networks:
+      - mon-reseau
+
+  # Logstash service
+  logstash:
+    image: docker.elastic.co/logstash/logstash:7.15.0
+    user: root
+    volumes:
+      - ./logstash.conf:/usr/share/logstash/pipeline/logstash.conf
+      - ./logstash.yml:/usr/share/logstash/config/logstash.yml
+      - logs:/var/log/apache2/html
+      - logstash_sincedb:/usr/share/logstash/sincedb:rw
+    depends_on:
+      - elasticsearch
+    environment:
+      - ELASTICSEARCH_USERNAME=elastic
+      - ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD}
+    networks:
+      - mon-reseau
+
+  # Kibana service
+  kibana:
+    hostname: kibana
+    image: docker.elastic.co/kibana/kibana:7.15.0
+    environment:
+      - SERVER_BASEPATH=/kibana
+      - SERVER_REWRITEBASEPATH=true
+      - ELASTICSEARCH_USERNAME=elastic
+      - ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD}
+      - xpack.encryptedSavedObjects.encryptionKey=${ELASTICSEARCH_ENCRYPTION_KEY}
+    depends_on:
+      - elasticsearch
+    networks:
+      - mon-reseau
+
+volumes:
+  es_data:
+  logstash_sincedb:
+  logs:
+
+networks:
+  mon-reseau:
