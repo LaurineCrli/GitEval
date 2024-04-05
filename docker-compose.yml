@@ -117,6 +117,8 @@ services:
       - xpack.encryptedSavedObjects.encryptionKey=${ELASTICSEARCH_ENCRYPTION_KEY}
     depends_on:
       - elasticsearch
+    ports:
+      - 5601:5601
     networks:
       - mon-reseau
 

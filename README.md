@@ -29,3 +29,14 @@ Un utilisateur et un mot de passe sont demandés pour accéder à la page, voici
 
 - Utilisateur : admin
 - Mot de Passe : pass
+
+### Kibana
+
+Au lancement de Mongo Express via le lien suivant : 
+
+```http://localhost:5601/kibana```
+
+Un utilisateur et un mot de passe sont demandés pour accéder à la page, voici les valeurs pas défaut données : 
+
+- Utilisateur : elastic
+- Mot de Passe : pass
